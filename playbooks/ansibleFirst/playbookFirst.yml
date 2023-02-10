@@ -1,0 +1,6 @@
+---
+- name: "Ssh connexion"
+  hosts: all
+  tasks: 
+    - name: "test connection"
+      command: /bin/hostname
