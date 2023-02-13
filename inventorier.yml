@@ -1,0 +1,48 @@
+---
+- name: "Inventorie l'ensemble du parc"
+  hosts: all
+  vars: 
+    path: "/home/administrateur/outils/check_var/outputcheck.txt"
+    namefile: 'outputcheck.csv'
+  tasks:
+    - name: "Create file"
+      file: 
+        state: touch
+        path: '{{ namefile }}'
+      delegate_to: localhost
+    
+    - name: "Get partition disk vars"
+      block:
+        - name: "Get partition"
+          set_fact: 
+            partition: "{% for mount in ansible_facts.mounts %}{% if (mount.device is defined) and (mount.size_total is defined) %}{{ mount.device }} : {{ (mount.size_total|float / 1000000000) | round(1, 'common') }}\r {% endif %}{% endfor %}"
+      rescue:
+        - name: "Handle errors"
+          set_fact: 
+            partition: ''
+    
+    - name: "Get all users"
+      getent:
+        database: passwd
+    
+    - name: "Get all groups"
+      getent:
+        database: group
+    
+    - name: "Formate users and groups"
+      set_fact:
+        users: "{% for user in getent_passwd %}{{ user }}\r {% endfor %}"
+        allGroups: "{% for group_name in getent_group %}{{ group_name }}:{{ getent_group[group_name][1] }} \r{% endfor %}"
+    
+    - name: "Filed file"
+      lineinfile:
+        state: present
+        dest: '{{ namefile }}'
+        line: '{{ item }}'
+      delegate_to: localhost
+      with_items:
+        - \"OS et Hostname\"; \"Uptime(s)\"; \"RAM(mb)\"; \"CPU(po)\"; \"Partition disk(G)\"; \"Users\"; \"Groups (et id)\"
+        - "\"{{ ansible_facts.distribution }} {{ ansible_facts.hostname }}\";\" {{ansible_facts.uptime_seconds}}\"; \"{{ansible_facts.memfree_mb}}\"; \"{{ansible_facts.processor_cores }}\"; \"{{partition}}\"; \"{{users}}\"; \"{{allGroups}}\""
+    # - name: Debug
+    #   debug: 
+    #     msg: '{{ users }} and {{ getent_group }}'
